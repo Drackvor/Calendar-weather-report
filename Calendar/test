@@ -1,0 +1,2539 @@
+var WeatherSystem = WeatherSystem || (function() {
+    'use strict';
+    
+    var debugMode = false;
+    
+    // Initialize the WeatherSystem state if it doesn't exist
+    if (!state.WeatherSystem) {
+    state.WeatherSystem = {
+        currentYear: 1492,
+        currentMonth: 0,
+        currentDay: 1,
+        currentHour: 0,
+        currentMinute: 0,
+        currentCalendarType: 'faerun',
+        calendars: Calendars, // Make sure Calendars is defined at this point
+        tempHoliday: {},
+        tempCalendar: {}
+    };
+    } else {
+    state.WeatherSystem.calendars = state.WeatherSystem.calendars || Calendars;
+    }
+    
+    if (!state.WeatherSystem.tempHoliday) {
+    state.WeatherSystem.tempHoliday = {};
+}
+    
+    if (typeof state.WeatherSystem.currentDayName === 'undefined') {
+    state.WeatherSystem.currentDayName = "Selday";  // Default or current day name
+}
+
+    if (state.WeatherSystem && state.WeatherSystem.holidays) {
+    holidays = state.WeatherSystem.holidays;
+    } else {
+    state.WeatherSystem = state.WeatherSystem || {};
+    state.WeatherSystem.holidays = holidays;
+}
+
+    var offSeasonChance = 5; // 5% chance for off-season weather
+    var magicalWeatherChance = 5; // 5% chance for magical weather
+
+    var seasons = ["Spring", "Summer", "Autumn", "Winter"];
+    var timesOfDay = ["Morning", "Afternoon", "Evening", "Night", "All day"];
+    var biomes = [
+        "Fields/Farmland", "Dungeons", "Cities", "Jungles", "Swamps",
+        "Open-water", "Mountains", "Forests", "Deserts", "Arctic",
+        "Volcanic Regions", "Underwater", "Caves", "Savannah", "Tundra",
+        "Coastal", "Rainforest", "Plains", "Hills", "Marshes"
+    ];
+    
+    var Calendars = {
+        faerun: {
+            months: [
+                { name: "Hammer", days: 30 },
+                { name: "Alturiak", days: 30 },
+                { name: "Ches", days: 30 },
+                { name: "Tarsakh", days: 30 },
+                { name: "Mirtul", days: 30 },
+                { name: "Kythorn", days: 30 },
+                { name: "Flamerule", days: 30 },
+                { name: "Eleasis", days: 30 },
+                { name: "Eleint", days: 30 },
+                { name: "Marpenoth", days: 30 },
+                { name: "Uktar", days: 30 },
+                { name: "Nightal", days: 30 }
+                ]
+            },
+        greyhawk: {
+            months: [
+                { name: "Needfest", days: 7 },
+                { name: "Fireseek", days: 28 },
+                { name: "Readying", days: 28 },
+                { name: "Coldeven", days: 28 },
+                { name: "Growfest", days: 7 },
+                { name: "Planting", days: 28 },
+                { name: "Flocktime", days: 28 },
+                { name: "Wealsun", days: 28 },
+                { name: "Richfest", days: 7 },
+                { name: "Reaping", days: 28 },
+                { name: "Goodmonth", days: 28 },
+                { name: "Harvester", days: 28 },
+                { name: "Brewfest", days: 7 },
+                { name: "Patchwall", days: 28 },
+                { name: "Ready'reat", days: 28 },
+                { name: "Sunsebb", days: 28 }
+                ]
+            },
+        krynn: {
+            months: [
+                { name: "Deepwinter", days: 28 },
+                { name: "Alturak", days: 28 },
+                { name: "Chislmont", days: 28 },
+                { name: "Giamonios", days: 28 },
+                { name: "Enkilot", days: 28 },
+                { name: "Paleshield", days: 28 },
+                { name: "Hiddumont", days: 28 },
+                { name: "Harvestfall", days: 28 },
+                { name: "Sirrimont", days: 28 },
+                { name: "Cordavan", days: 28 },
+                { name: "Frostkolt", days: 28 },
+                { name: "Graystone", days: 28 }
+                ]
+            },
+        eberron: {
+            months: [
+                { name: "Zarantyr", days: 28 },
+                { name: "Olarune", days: 28 },
+                { name: "Therendor", days: 28 },
+                { name: "Eyre", days: 28 },
+                { name: "Dravago", days: 28 },
+                { name: "Nymm", days: 28 },
+                { name: "Lharvion", days: 28 },
+                { name: "Barrakas", days: 28 },
+                { name: "Rhaan", days: 28 },
+                { name: "Sypheros", days: 28 },
+                { name: "Aryth", days: 28 },
+                { name: "Vult", days: 28 }
+                ]
+            },
+        golarian: {
+            months: [
+                { name: "Abadius", days: 31 },
+                { name: "Calistril", days: 28 },
+                { name: "Pharast", days: 31 },
+                { name: "Gozran", days: 30 },
+                { name: "Desnus", days: 31 },
+                { name: "Sarenith", days: 30 },
+                { name: "Erastus", days: 31 },
+                { name: "Arodus", days: 31 },
+                { name: "Rova", days: 30 },
+                { name: "Lamashan", days: 31 },
+                { name: "Neth", days: 30 },
+                { name: "Kuthona", days: 31 }
+                ]
+            },
+        mystara: {
+            months: [
+                { name: "Nuwmont", days: 28 },
+                { name: "Vatermont", days: 28 },
+                { name: "Thaumont", days: 28 },
+                { name: "Flaurmont", days: 28 },
+                { name: "Yarthmont", days: 28 },
+                { name: "Klarmont", days: 28 },
+                { name: "Felmont", days: 28 },
+                { name: "Fyrmont", days: 28 },
+                { name: "Ambyrmont", days: 28 },
+                { name: "Sviftmont", days: 28 },
+                { name: "Eirmont", days: 28 },
+                { name: "Kaldmont", days: 28 }
+                ]
+            },
+        athas: {
+            months: [
+                { name: "Scorch", days: 30 },
+                { name: "Burn", days: 30 },
+                { name: "Flame", days: 30 },
+                { name: "Blaze", days: 30 },
+                { name: "Inferno", days: 30 },
+                { name: "Sear", days: 30 },
+                { name: "Char", days: 30 },
+                { name: "Ember", days: 30 },
+                { name: "Ash", days: 30 },
+                { name: "Smolder", days: 30 },
+                { name: "Spark", days: 30 },
+                { name: "Flicker", days: 30 }
+                ]
+            },
+        ravenloft: {
+            months: [
+                { name: "Vandor", days: 28 },
+                { name: "Massik", days: 28 },
+                { name: "Pales", days: 28 },
+                { name: "Meloria", days: 28 },
+                { name: "Gnast", days: 28 },
+                { name: "Kasta", days: 28 },
+                { name: "Moridor", days: 28 },
+                { name: "Vlach", days: 28 },
+                { name: "Brach", days: 28 },
+                { name: "Yoph", days: 28 },
+                { name: "Shivar", days: 28 },
+                { name: "Pyatin", days: 28 }
+                ]
+            },
+        gregorian: {
+            months: [
+                { name: "January", days: 31 },
+                { name: "February", days: 28 }, // Note: 29 days in leap years
+                { name: "March", days: 31 },
+                { name: "April", days: 30 },
+                { name: "May", days: 31 },
+                { name: "June", days: 30 },
+                { name: "July", days: 31 },
+                { name: "August", days: 31 },
+                { name: "September", days: 30 },
+                { name: "October", days: 31 },
+                { name: "November", days: 30 },
+                { name: "December", days: 31 }
+                ]
+            }
+};
+    
+    var Weekdays = {
+    faerun: ["Firstday", "Secondday", "Thirdday", "Fourthday", "Fifthday", "Sixthday", "Seventhday", "Eighthday", "Ninthday", "Tenthday"],
+    greyhawk: ["Starday", "Sunday", "Moonday", "Godsday", "Waterday", "Earthday", "Freeday"],
+    krynn: ["Solinari", "Lunitari", "Nuitari", "Reorx", "Shinare", "Sirrion", "Majere", "Gilean", "Mishakal", "Paladine", "Takhisis"],
+    eberron: ["Sul", "Mol", "Zol", "Wir", "Zor", "Far", "Sar"],
+    golarion: ["Moonday", "Toilday", "Wealday", "Oathday", "Fireday", "Starday", "Sunday"],
+    mystara: ["Lunadain", "Gromdain", "Tserdain", "Moldain", "Nytdain", "Loshdain", "Soladain"],
+    athas: ["Sundown", "Sandday", "Firenight", "Cactiday", "Windrise", "Thirstday", "Surviveday"],
+    ravenloft: ["Magiday", "Earthday", "Seaday", "Winday", "Fireday", "Waterday", "Starday"],
+    gregorian: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    // Add other calendars' weekdays here
+};
+
+    var holidays = {
+    faerun: [
+        { month: "Hammer", day: 1, name: "Midwinter" },
+        // Add other holidays for Faerun here
+    ],
+    greyhawk: [
+        { month: "Needfest", day: 1, name: "New Year's Festival" },
+        // Add other holidays for Greyhawk here
+    ],
+    // Add more calendar types as necessary
+};
+    
+    var uniqueSeasons = {
+    "Dungeons": ["Ancient Crypt", "Underground Labyrinth", "Abandoned Mineshaft", "Subterranean Fortress", "Forgotten Catacombs", "Hidden Sanctuary", "Dark Chamber", "Prison Cells"],
+    "Jungles": ["Dense Canopy", "River Basin", "Overgrown Temple", "Mossy Clearing", "Vine Entwined Ruins", "Jungle Waterfalls", "Tropical Undergrowth", "Wild Orchid Grove"],
+    "Swamps": ["Foggy Marshland", "Stagnant Pools", "Willow Grove", "Muddy Quagmire", "Reed Beds", "Cypress Forest", "Silt Laden Banks", "Boggy Meadows"],
+    "Open-water": ["Coral Reef", "Deep Sea Trench", "Sunken Shipwreck", "Stormy Waters", "Calm Seas", "Oceanic Abyss", "Seagrass Meadows", "Pelagic Zone"],
+    "Deserts": ["Sandy Dunes", "Rocky Plateau", "Oasis", "Sun-Scorched Plains", "Salt Flats", "Desert Canyons", "Mirage Oasis", "Dust Devil Trails"],
+    "Arctic": ["Frozen Sea", "Glacial Caves", "Polar Tundra", "Iceberg Field", "Snow-Capped Peaks", "Frosty Fjords", "Northern Lights", "Icy Plains"],
+    "Underwater": ["Kelp Forest", "Abyssal Zone", "Sunlit Shoal", "Hydrothermal Vent", "Coral Gardens", "Twilight Zone", "Marine Trench", "Seamount"],
+    "Caves": ["Crystal Cavern", "Echoing Grotto", "Subterranean River", "Dark Chasm", "Limestone Labyrinth", "Dripstone Gallery", "Bat Colony", "Fossil Bed"],
+    "Volcanic Regions": ["Lava Flows", "Ashen Wasteland", "Sulfur Springs", "Magma Chamber", "Pumice Stone Field", "Volcanic Crater", "Geothermal Pool", "Obsidian Cliffs"],
+    "Tundra": ["Permafrost Plains", "Moss Tundra", "Arctic Highlands", "Frozen Lakes", "Snow Dunes", "Blizzard Valleys", "Thawing Springs", "Arctic Desert"],
+    "Rainforest": ["Canopy Layer", "Forest Floor", "River Delta", "Mountain Foothills", "Cloud Forest", "Dense Thicket", "Wildlife Haven", "Hanging Gardens"]
+};
+
+    var weatherDetails = {
+        "Fields/Farmland": {
+        "Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": ["Placeholder description 1", "Placeholder description 2"],
+                "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+                "Evening": ["Placeholder description 1", "Placeholder description 2"],
+                "Night": ["Placeholder description 1", "Placeholder description 2"]
+            }
+    },
+        
+        "Dungeons": {
+            "Ancient Crypt": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+
+        },
+        "Underground Labyrinth": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Abandoned Mineshaft": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Subterranean Fortres": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Forgotten Catacombs": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Hidden Sanctuary": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Dark Chamber": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Prison Cells": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Cities": {
+            "Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+            
+        "Jungles": {
+            "Dense Canopy": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "River Basin": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Overgrown Temple": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Mossy Clearing": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Vine Entwined Ruins": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Jungle Waterfalls": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Tropical Undergrowth": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Wild Orchid Grove": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+            
+        "Swamps": {"Foggy Marshland": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Stagnant Pools": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Willow Grove": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Muddy Quagmire": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Reed Beds": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Cypress Forest": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Silt Laden Banks": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Boggy Meadows": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+    
+        "Open-water": {"Coral Reef": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Deep Sea Trench": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Sunken Shipwreck": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Stormy Waters": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Calm Seas": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Oceanic Abyss": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Seagrass Meadows": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Pelagic Zone": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+            
+        "Mountains": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Forests": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        "Deserts": {"Sandy Dunes": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Rocky Plateau": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Oasis": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Sun-Scorched Plains": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Salt Flats": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Desert Canyons": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Mirage Oasis": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Dust Devil Trails": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Arctic": {"Frozen Sea": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Glacial Caves": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Polar Tundra": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Iceberg Field": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Snow-Capped Peaks": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Frosty Fjords": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Northern Lights": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Icy Plains": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Volcanic Regions": {"Lava Flows": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Ashen Wasteland": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Sulfur Springs": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magma Chamber": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Pumice Stone Field": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Volcanic Crater": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Geothermal Pool": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Obsidian Cliffs": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Underwater": {"Kelp Forest": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Abyssal Zone": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Sunlit Shoal": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Hydrothermal Vent": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Coral Gardens": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Twilight Zone": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Marine Trench": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Seamount": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Caves": {"Crystal Cavern": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Echoing Grotto": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Subterranean River": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Dark Chasm": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Limestone Labyrinth": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Dripstone Gallery": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Bat Colony": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Fossil Bed": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Savannah": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Tundra": {"Permafrost Plains": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Moss Tundra": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Arctic Highlands": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Frozen Lakes": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Snow Dunes": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Blizzard Valleys": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Thawing Springs": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Arctic Desert": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Coastal": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Rainforest": {"Canopy Layer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Forest Floor": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "River Delta": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Mountain Foothills": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Cloud Forest": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Dense Thicket": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Wildlife Haven": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Hanging Gardens": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Plains": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Hills": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    },
+        
+        "Marshes": {"Spring": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Summer": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Autumn": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Winter": { 
+            "Morning": ["Placeholder description 1", "Placeholder description 2"],
+            "Afternoon": ["Placeholder description 1", "Placeholder description 2"],
+            "Evening": ["Placeholder description 1", "Placeholder description 2"],
+            "Night": ["Placeholder description 1", "Placeholder description 2"]
+        },
+        "Magical": {
+                "Morning": [/* Magical weather descriptions for morning */],
+                "Afternoon": [/* Magical weather descriptions for afternoon */],
+                "Evening": [/* Magical weather descriptions for evening */],
+                "Night": [/* Magical weather descriptions for night */]
+            }
+    }
+    };
+
+    var introPhrases = {
+    "Fields/Farmland": {
+        "Morning": ["With the dawn breaking,",
+    "As the morning unfolds,",
+    "Greeting the early light,",
+    "With the first light of day,",
+    "As the sun begins its ascent,",
+    "As daybreak paints the sky,",
+    "With the sun's first rays,",
+    "Embracing the new day,",
+    "As morning's light filters through,",
+    "Welcoming the dawn's embrace,",
+    "In the quiet of the early morning,",
+    "As the horizon brightens,",
+    "Beneath the widening light,",
+    "With the awakening of the world,",
+    "As daylight takes its first breath,",
+    "Greeting the day with open arms,",
+    "As the new dawn emerges,",
+    "With the gentle light of morning,",
+    "As the day begins to unfold,",
+    "Welcoming the first light with joy,"],
+        "Afternoon": ["As the day progresses,",
+    "In the heart of the day,",
+    "As the sun stands overhead,",
+    "Into the warmth of the afternoon,",
+    "Basking in the midday sun,",
+    "During the day's peak,",
+    "As the sun reaches its zenith,",
+    "Under the high sun,",
+    "Amidst the day's full bloom,",
+    "In the full throttle of daylight,",
+    "As the day wears on,",
+    "Embracing the day's warmth,",
+    "With the sun at its highest,",
+    "In the luminance of midday,",
+    "As afternoon warmth envelops,",
+    "In the vibrant afternoon light,",
+    "With the day's brightness at its peak,",
+    "As we navigate the day's height,",
+    "Amid the clarity of the afternoon sun,"],
+        "Evening": ["As the evening descends,",
+    "With the sunset approaching,",
+    "As dusk settles in,",
+    "In the quiet of the evening,",
+    "As the light fades,",
+    "Under the twilight sky,",
+    "As nightfall begins to cloak,",
+    "With the day's end near,",
+    "In the dimming light of day,",
+    "As shadows grow longer,",
+    "With the evening's calm settling,",
+    "As the stars begin to appear,",
+    "In the hush of the approaching night,",
+    "As the darkness gently envelops,",
+    "With the last rays of sun,",
+    "In the serene transition to night,",
+    "As the evening air cools,",
+    "With the close of the day at hand,",
+    "In the peaceful embrace of evening,",
+    "As the twilight deepens,"],
+        "Night": ["And into the night,",
+    "As darkness envelops the land,",
+    "Under the starlit sky,",
+    "Through the silent night,",
+    "As the moon rises high,",
+    "Beneath the veil of darkness,",
+    "With the stars as our guide,",
+    "As the world falls into slumber,",
+    "In the quiet of the night,",
+    "Under the watchful eye of the moon,",
+    "As night's embrace tightens,",
+    "When the shadows grow long,",
+    "In the hush of the late hours,",
+    "As the evening's magic unfolds,",
+    "Beneath the constellation's gaze,",
+    "While the night whispers softly,",
+    "In the stillness that only night brings,",
+    "As the darkness weaves its spell,",
+    "Under the blanket of the night sky,",
+    "When the world pauses, wrapped in nocturnal beauty,"]
+    },
+    "Dungeons": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Cities": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Jungles": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Swamps": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Open-water": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Mountains": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Forests": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Deserts": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Arctic": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Volcanic Regions": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Underwater": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Caves": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Savannah": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Tundra": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Coastal": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Rainforest": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Plains": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Hills": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    },
+    "Marshes": {
+        "Morning": ["PH1", "PH2"],
+        "Afternoon": ["PH1", "PH2"],
+        "Evening": ["PH1", "PH2"],
+        "Night": ["PH1", "PH2"]
+    }
+    // Add more biomes with specific intro phrases as needed
+};
+
+function setCalendarType(calendarType) {
+    if (Calendars[calendarType]) {
+        state.WeatherSystem.currentCalendarType = calendarType;
+        log(`Calendar type set to ${calendarType}`);
+        displayCalendar(); // Refresh the calendar display
+    } else {
+        log(`Invalid calendar type: ${calendarType}`);
+    }
+}
+
+function logDebug(message) {
+        if (debugMode) {
+            log(`WeatherSystem Debug: ${message}`);
+        }
+    }
+
+function toggleDebug() {
+        debugMode = !debugMode;
+        log(`Debug mode is now ${debugMode ? 'enabled' : 'disabled'}`);
+        sendChat('WeatherSystem', `/w gm Debug mode is now ${debugMode ? 'enabled' : 'disabled'}.`);
+    }
+
+function getIntroPhrase(biome, timeOfDay) {
+    logDebug(`Getting intro phrase for Biome: ${biome}, Time of Day: ${timeOfDay}`);
+
+    // Check if the biome has specific intro phrases
+    if (introPhrases[biome]) {
+        logDebug(`Found intro phrases for Biome: ${biome}`);
+
+        // Check if the time of day has specific intro phrases within the biome
+        if (introPhrases[biome][timeOfDay]) {
+            logDebug(`Found intro phrases for Time of Day: ${timeOfDay} in Biome: ${biome}`);
+            return getRandomElement(introPhrases[biome][timeOfDay]);
+        } else {
+            logDebug(`No specific intro phrases found for Time of Day: ${timeOfDay} in Biome: ${biome}`);
+        }
+    } else {
+        logDebug(`No intro phrases found for Biome: ${biome}`);
+    }
+
+    // Fallback intro phrase if no specific one is found
+    logDebug(`Using default intro phrase`);
+    return "The day unfolds in its own rhythm,";
+}
+
+function showMainMenu() {
+    logDebug('Showing Main Menu');
+
+    let template = getTemplate();
+    let message = template.boxcode + template.titlecode + "Main Menu" + template.footer;
+    message += template.textcode + "Select an option:" + template.footer;
+
+    let biome = state.WeatherSystem.currentBiome;
+    let season = state.WeatherSystem.currentSeason;
+
+    message += createButton("Weather Report", `!castweather ${biome} ${season} ${getTimeOfDay(state.WeatherSystem.currentHour)}`);
+    message += createButton("All Day Weather Report", `!castweather ${biome} ${season} all-day`);
+
+    message += createButton("Calendar", "!displayCalendar");
+    message += createButton("DM Control Panel", "!showDmControlPanel");
+
+    message += template.footer;
+    sendChat("System", message);
+
+    logDebug('Main Menu displayed');
+}
+
+function getCurrentSeason(monthIndex) {
+    logDebug(`Determining current season for month index: ${monthIndex}`);
+    if (monthIndex >= 0 && monthIndex < 3) return "Winter";
+    if (monthIndex >= 3 && monthIndex < 6) return "Spring";
+    if (monthIndex >= 6 && monthIndex < 9) return "Summer";
+    if (monthIndex >= 9 && monthIndex < 12) return "Autumn";
+    return "Winter";  // Default to Winter
+}
+
+function getTimeOfDay(hour) {
+    if (hour >= 21 || hour < 6) return "Night";
+    if (hour >= 6 && hour < 12) return "Morning";
+    if (hour >= 12 && hour < 17) return "Afternoon";
+    if (hour >= 17 && hour < 21) return "Evening";
+}
+
+function getDayOfWeek(year, monthIndex, day) {
+    // This is a placeholder function. You need to replace it with actual logic 
+    // that calculates the day of the week based on the specific rules of your calendar system.
+    const calendarType = state.WeatherSystem.currentCalendarType;
+    const calendar = Calendars[calendarType];
+    const weekdays = Weekdays[calendarType];
+
+    if (!calendar || !weekdays) {
+        log(`Invalid calendar type or weekdays not defined for: ${calendarType}`);
+        return "Unknown Day";
+    }
+
+    // Simple example: Calculate total days since a fixed point in time (e.g., the start of the calendar)
+    let totalDays = day;
+    for (let m = 0; m < monthIndex; m++) {
+        totalDays += calendar.months[m].days;
+    }
+    // Adjust for leap years if necessary
+    if (calendarType === "gregorian" && isLeapYear(year) && monthIndex > 1) {
+        totalDays += 1; // Add an extra day if past February in a leap year
+    }
+
+    const weekDayIndex = (totalDays - 1) % weekdays.length; // Adjusted to align with zero-indexed array
+    return weekdays[weekDayIndex];
+}
+
+function getOrdinalSuffix(day) {
+    let j = day % 10,
+        k = day % 100;
+    if (j == 1 && k != 11) {
+        return day + "st";
+    }
+    if (j == 2 && k != 12) {
+        return day + "nd";
+    }
+    if (j == 3 && k != 13) {
+        return day + "rd";
+    }
+    return day + "th";
+}
+
+function displayCalendar() {
+    logDebug("Starting displayCalendar function");
+    log("Calendars object inside displayCalendar: " + JSON.stringify(Calendars));
+    log("State WeatherSystem.calendars inside displayCalendar: " + JSON.stringify(state.WeatherSystem.calendars));
+
+    let currentCalendar; // Define currentCalendar here to have function-wide scope
+
+    let template = getTemplate();
+    let year = state.WeatherSystem.currentYear;
+    let monthIndex = state.WeatherSystem.currentMonth; // Assuming this is 0-indexed
+    let day = state.WeatherSystem.currentDay;
+    let hour = state.WeatherSystem.currentHour;
+    let minute = state.WeatherSystem.currentMinute;
+    let calendarType = state.WeatherSystem.currentCalendarType;
+    logDebug("Accessing calendar type: " + calendarType);
+
+    // Ensure Calendars object is defined and has the calendarType key
+    if (typeof Calendars !== 'undefined' && Calendars.hasOwnProperty(calendarType)) {
+        logDebug("Calendars keys: " + Object.keys(Calendars));
+        currentCalendar = Calendars[calendarType]; // Assign to the function-wide variable
+
+        // Check if currentCalendar is successfully retrieved
+        if (currentCalendar) {
+            logDebug("Current calendar is defined.");
+            // Continue with your existing logic, using currentCalendar...
+        } else {
+            logDebug("Current calendar is undefined.");
+            return; // Exit function if no valid calendar is found
+        }
+    } else {
+        logDebug("Calendars is undefined or does not contain the calendar type.");
+        return; // Exit function if Calendars object is not properly defined
+    }
+
+    let monthName = currentCalendar.months[monthIndex].name;
+    let dayOfWeek = getDayOfWeek(year, monthIndex, day);
+    logDebug(`Day of week: ${dayOfWeek}`);
+    let ordinalDay = getOrdinalSuffix(day);
+
+    let message = template.boxcode + template.titlecode + "Current Date and Time" + template.footer;
+    message += template.textcode;
+    message += `Year: ${year}<br>`;
+    message += `Day: ${dayOfWeek} ${ordinalDay} of ${monthName}<br>`;
+
+    // Get holidays from the separate holidays object
+    let standardHolidays = holidays[state.WeatherSystem.currentCalendarType] || [];
+    let userAddedHolidays = state.WeatherSystem.holidays[state.WeatherSystem.currentCalendarType] || [];
+    let allHolidays = [...standardHolidays, ...userAddedHolidays];
+
+    // Check for holidays on the current day
+    let holidaysToday = allHolidays.filter(holiday => {
+        return holiday.month === monthName && holiday.day === day;
+    });
+
+    if (holidaysToday.length > 0) {
+        let holidayNames = holidaysToday.map(holiday => holiday.name).join(", ");
+        message += `Holidays today: ${holidayNames}<br>`;
+        logDebug(`Holidays today: ${holidayNames}`);
+    }
+
+    // Check for leap day in leap years and adjust the display accordingly
+    let monthLength = currentCalendar.months[monthIndex].days;
+    if (isLeapYear(year, calendarType) && monthIndex === 1 && day > monthLength) {
+        let leapDayName = getLeapDayName(calendarType); // Function to get the name of the leap day
+        message += `Special Day: ${leapDayName}<br>`;
+    }
+
+    let weatherBiome = state.WeatherSystem.currentBiome || 'Cities';
+    let season = state.WeatherSystem.currentSeason || getCurrentSeason(monthIndex);
+    let timeOfDay = getTimeOfDay(hour);
+    let weatherDescription = chooseWeather(weatherBiome, season, timeOfDay);
+    let introPhrase = getIntroPhrase(weatherBiome, timeOfDay);
+
+    message += `Time: ${hour}:${minute < 10 ? '0' + minute : minute}<br>`;
+    message += `Season: ${season}<br>`;
+    message += `Time of Day: ${timeOfDay}<br>`;
+    message += `Biome: ${weatherBiome}<br>`;
+    message += `Weather: ${introPhrase} ${weatherDescription}<br>`;
+    message += template.footer;
+
+    sendChat("Calendar", message);
+    logDebug("Calendar display function completed");
+}
+
+function isLeapYear(year, calendarType) {
+    switch (calendarType) {
+        case 'mystara':
+            // Mystara: 200-year cycle, leap years every 6 years, skipping 100th unless divisible by 200
+            if (year % 6 === 0) {
+                if (year % 100 === 0 && year % 200 !== 0) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+
+        case 'athas':
+            // Athas: 400-year cycle, leap years every 8 years, skipping 100th unless divisible by 400
+            if (year % 8 === 0) {
+                if (year % 100 === 0 && year % 400 !== 0) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+
+        case 'ravenloft':
+            // Ravenloft: 500-year cycle, leap years every 13 years, skipping 100th unless divisible by 500
+            if (year % 13 === 0) {
+                if (year % 100 === 0 && year % 500 !== 0) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+
+        case 'greyhawk':
+            // Greyhawk: 600-year cycle, leap years every 4 years, skipping 100th unless divisible by 600
+            if (year % 4 === 0) {
+                if (year % 100 === 0 && year % 600 !== 0) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+
+        case 'eberron':
+            // Eberron: 300-year cycle, leap years every 5 years, skipping 100th unless divisible by 300
+            if (year % 5 === 0) {
+                if (year % 100 === 0 && year % 300 !== 0) {
+                    return false;
+                }
+                return true;
+            }
+            return false;
+
+        case 'gregorian':
+            // Gregorian: standard rule with 4, 100, and 400-year exceptions
+            if (year % 4 !== 0) {
+                return false;
+            } else if (year % 100 !== 0) {
+                return true;
+            } else if (year % 400 !== 0) {
+                return false;
+            } else {
+                return true;
+            }
+
+        default:
+            // For calendars without specific leap year rules
+            return false;
+    }
+}
+
+function setCalendarDate(calendarName, year, month, day, hour, minute) {
+    // Get the specific calendar object
+    var calendar = Calendars[calendarName];
+
+    if (!calendar) {
+        sendChat("System", "Calendar not found.");
+        return;
+    }
+
+    // Ensure month and day are within valid ranges
+    if (month < 1) month = 1;
+    if (month > calendar.months.length) month = calendar.months.length;
+    let maxDay = (month === 2 && isLeapYear(year)) ? 29 : calendar.months[month - 1].days;
+
+    if (day < 1) day = 1;
+    if (day > maxDay) day = maxDay;
+
+    // Validate and set the time
+    if (hour < 0) hour = 0;
+    if (hour > 23) hour = 23;
+    if (minute < 0) minute = 0;
+    if (minute > 59) minute = 59;
+
+    // Assuming you have a way to set the current date and time in your calendar object
+    calendar.currentYear = year;
+    calendar.currentMonth = month - 1; // Adjust for 0-indexed array
+    calendar.currentDay = day;
+    calendar.currentHour = hour;
+    calendar.currentMinute = minute;
+
+    // Update the calendar in the state, if needed
+    Calendars[calendarName] = calendar;
+
+    sendChat("System", `Date set to ${day}-${month}-${year} ${hour}:${minute} in ${calendarName} calendar.`);
+}
+
+function formatTime(hour, minute) {
+    // Ensure hour and minute are within the correct range
+    hour = Math.max(0, Math.min(23, hour));
+    minute = Math.max(0, Math.min(59, minute));
+
+    // Pad single digit numbers with a leading zero
+    let formattedHour = hour.toString().padStart(2, '0');
+    let formattedMinute = minute.toString().padStart(2, '0');
+
+    return `${formattedHour}:${formattedMinute}`;
+}
+
+function advanceTime(unit, amount) {
+    let oldDateTime = getCurrentDateTime();  // Assume this function returns the current date and time before changes
+
+    // Perform the time advancement based on the unit (minute, hour, day, month)
+    switch (unit) {
+        case 'minute':
+        case 'minutes':
+            state.WeatherSystem.currentMinute += parseInt(amount, 10);
+            while (state.WeatherSystem.currentMinute >= 60) {
+                state.WeatherSystem.currentMinute -= 60;
+                state.WeatherSystem.currentHour++;
+            }
+            break;
+        case 'hour':
+        case 'hours':
+            state.WeatherSystem.currentHour += parseInt(amount, 10);
+            while (state.WeatherSystem.currentHour >= 24) {
+                state.WeatherSystem.currentHour -= 24;
+                state.WeatherSystem.currentDay++;
+            }
+            break;
+        case 'day':
+        case 'days':
+            state.WeatherSystem.currentDay += parseInt(amount, 10);
+            break;
+        case 'month':
+        case 'months':
+            state.WeatherSystem.currentMonth += parseInt(amount, 10);
+            break;
+    }
+
+    let newDateTime = getCurrentDateTime();  // Refresh the date and time after the changes
+
+    // Ensure that hour and minute are defined
+    let formattedHour = newDateTime.hour !== undefined ? newDateTime.hour : 0;
+    let formattedMinute = newDateTime.minute !== undefined ? newDateTime.minute : 0;
+
+    // Create and send the chat message using the formatTime function for time formatting
+    let message = `Advanced time by ${amount} ${unit}. `;
+    message += `The date and time is now ${newDateTime.year}-${newDateTime.monthName}-${newDateTime.dayOfMonth} ${formatTime(formattedHour, formattedMinute)}.`;
+    sendChat("Time System", message);
+}
+
+function getCurrentDateTime() {
+    let year = state.WeatherSystem.currentYear;
+    let monthIndex = state.WeatherSystem.currentMonth;
+    let day = state.WeatherSystem.currentDay;
+    let hour = state.WeatherSystem.currentHour;
+    let minute = state.WeatherSystem.currentMinute;
+    let currentCalendar = Calendars[state.WeatherSystem.currentCalendarType];
+    let monthName = currentCalendar.months[monthIndex].name;
+
+    return {
+        year: year,
+        monthName: monthName,
+        dayOfMonth: day,
+        hour: hour,           // Provide hour separately
+        minute: minute        // Provide minute separately
+    };
+}
+
+function getHoliday(calendarType, month, day) {
+    if (!holidays[calendarType]) return []; // Return empty array if no holidays are defined for the calendar
+
+    return holidays[calendarType]
+        .filter(holiday => holiday.month === month && holiday.day === day)
+        .map(holiday => holiday.name); // Return an array of holiday names
+}
+
+function showDmControlPanel() {
+    let template = getTemplate();
+    logDebug("Displaying DM Control Panel");
+    
+    let calendarType = state.WeatherSystem.currentCalendarType || 'faerun';
+    let currentCalendar = Calendars[calendarType];
+    if (!currentCalendar) {
+        logDebug(`Calendar type '${calendarType}' is not defined.`);
+        throw new Error(`Calendar type '${calendarType}' is not defined.`);
+    }
+
+    let message = template.boxcode + template.titlecode + "DM Control Panel" + template.footer;
+    message += template.textcode;
+
+    message += `Set Date and Time:<br>`;
+    message += createButton("Set Year", "!setyear ?{Enter Year|1492}");
+
+    // Dynamically generate month options based on the current calendar
+    let monthOptions = currentCalendar.months.map(m => m.name).join('|');
+    message += createButton("Set Month", `!setmonth ?{Choose Month|${monthOptions}}`);
+
+    // Dynamically generate day options based on the maximum days in a month for the current calendar
+    let maxDays = Math.max(...currentCalendar.months.map(m => m.days));
+    let dayOptions = Array.from({ length: maxDays }, (_, i) => i + 1).join('|');
+    message += createButton("Set Day", `!setday ?{Choose Day|${dayOptions}}`);
+
+    let hourOptions = Array.from({ length: 24 }, (_, i) => `${i}:00`).join('|');
+    message += createButton("Set Time", `!settime ?{Choose Time|${hourOptions}}`);
+
+    let biomeOptions = biomes.join('|');
+    message += createButton("Set Biome", `!selectbiome ?{Choose Biome|${biomeOptions}}`);
+
+    message += `<br>Advance Time:<br>`;
+    message += createButton("Advance Minute", "!advancetime minute ?{Enter Minutes|0}");
+    message += createButton("Advance Hour", "!advancetime hour ?{Enter Hours|0}");
+    message += createButton("Advance Day", "!advancetime day ?{Enter Days|0}");
+    message += createButton("Advance Month", "!advancetime month ?{Enter Months|0}");
+
+    message += `<br>Set Calendar Type:<br>`;
+    Object.keys(Calendars).forEach(calendar => {
+        message += createButton(calendar.charAt(0).toUpperCase() + calendar.slice(1), `!setCalendarType ${calendar}`);
+    });
+    
+    message += `<br>Add Holiday/Calendar<br>`;
+    message += createButton("Add Holiday", "!addHolidayMenu");
+    message += createButton("Add Calendar", "!addNewCalendar")
+    
+    message += `<br>Admin Functions<br>`;
+    message += createButton("Reset Calendar", "!resetWeatherSystem");
+    message += createButton("Debug Mode", "!toggleDebug");
+    message += `<br><br>`;
+    message += createButton("Remove all added Holidays", "!removeAllUserAddedHolidays" )
+    message += createButton("Display All added Holidays", "!displayUserAddedHolidays")
+
+    message += template.footer;
+    sendChat("DM Control Panel", message);
+}
+
+function selectBiome(biome) {
+    const oldBiome = state.WeatherSystem.currentBiome || "None";
+    state.WeatherSystem.currentBiome = biome;
+    logDebug(`Biome set to ${biome}`);
+
+    sendChat("System", `Biome changed from ${oldBiome} to ${biome}.`);
+
+    if (uniqueSeasons && uniqueSeasons[biome]) {
+        logDebug(`Biome ${biome} has unique seasons. Prompting for season selection.`);
+        showSeasonSelectionMenu(biome);
+    } else {
+        state.WeatherSystem.currentSeason = getCurrentSeason(state.WeatherSystem.currentMonth);
+        logDebug(`Setting season based on current month (${state.WeatherSystem.currentMonth}): ${state.WeatherSystem.currentSeason}`);
+        displayCalendar(); // Assume this updates the calendar display
+    }
+}
+
+function showSeasonSelectionMenu(biome) {
+    let seasons = uniqueSeasons[biome];
+    let template = getTemplate();
+    if (seasons) {
+        let message = template.boxcode + template.titlecode + `Select a season for ${biome}:` + template.footer;
+        seasons.forEach(season => {
+            message += template.textcode + createButton(season, `!setseason ${encodeURIComponent(season)}`) + template.footer;
+        });
+
+        sendChat("WeatherSystem", message);
+    }
+}
+
+function setSeason(season) {
+    state.WeatherSystem.currentSeason = season;
+    logDebug(`Season set to ${season}`);
+    displayCalendar(); // Refresh the calendar to show the updated season
+}
+
+var currentState = {
+    year: 1492,  // Example starting year
+    month: 0,    // Starting with 1 for January
+    day: 1,
+    hour: 0,
+    minute: 0
+};
+
+function setYear(year) {
+    const oldYear = state.WeatherSystem.currentYear || 0;
+    state.WeatherSystem.currentYear = parseInt(year, 10);
+    logDebug(`Year set to ${state.WeatherSystem.currentYear}`);
+
+    sendChat("System", `Year changed from ${oldYear} to ${state.WeatherSystem.currentYear}.`);
+}
+
+function setMonth(monthName) {
+    logDebug(`Attempting to set month with raw input: ${monthName}`);
+
+    monthName = String(monthName).trim();
+    logDebug(`Processed month name: ${monthName}`);
+
+    let calendarType = state.WeatherSystem.currentCalendarType;
+    let currentCalendar = Calendars[calendarType];
+
+    if (!currentCalendar) {
+        logDebug(`Calendar type '${calendarType}' is not defined.`);
+        throw new Error(`Calendar type '${calendarType}' is not defined.`);
+    }
+
+    let oldMonthIndex = state.WeatherSystem.currentMonth;
+    let oldMonthName = currentCalendar.months[oldMonthIndex]?.name || "None";
+
+    const monthIndex = currentCalendar.months.findIndex(m => m.name.toLowerCase() === monthName.toLowerCase());
+
+    if (monthIndex !== -1) {
+        state.WeatherSystem.currentMonth = monthIndex;
+        logDebug(`Month changed from ${oldMonthName} to ${currentCalendar.months[monthIndex].name}`);
+        sendChat("System", `Month changed from ${oldMonthName} to ${currentCalendar.months[monthIndex].name}.`);
+    } else {
+        logDebug(`Invalid month value: ${monthName}`);
+    }
+
+    // Remove any direct call to showDmControlPanel() here if it's being called elsewhere in response to these changes
+}
+
+// Function to set the day
+function setDay(dayNumber) {
+    if (dayNumber >= 1 && dayNumber <= 30) { // Assuming all months have 30 days for simplicity
+        state.WeatherSystem.currentDay = dayNumber;
+        logDebug(`Numerical day set to ${dayNumber}`);
+    } else {
+        logDebug(`Invalid day number: ${dayNumber}`);
+    }
+}
+
+function setDayNumber(dayNumber) {
+    dayNumber = parseInt(dayNumber, 10); // Convert the input to an integer
+
+    // Check if the day number is within the simplified range
+    if (dayNumber >= 1 && dayNumber <= 30) {
+        state.WeatherSystem.currentDay = dayNumber;
+        logDebug(`Day number set to ${dayNumber}`);
+    } else {
+        logDebug(`Invalid day number: ${dayNumber}. Must be between 1 and 30`);
+    }
+}
+
+function setDayName(dayName) {
+    if (daysOfWeek.includes(dayName)) {
+        state.WeatherSystem.currentDayName = dayName;
+        logDebug(`Day name set to ${dayName}`);
+    } else {
+        logDebug(`Invalid day name: ${dayName}`);
+    }
+}
+
+// Function to set the time
+function setTime(hour, minute) {
+    // Parse the hour and minute to integers immediately upon assignment
+    state.WeatherSystem.currentHour = parseInt(hour, 10);
+    state.WeatherSystem.currentMinute = parseInt(minute, 10);
+
+    // After parsing, validate the hour and minute to be within the correct range
+    if (state.WeatherSystem.currentHour >= 0 && state.WeatherSystem.currentHour < 24 && 
+        state.WeatherSystem.currentMinute >= 0 && state.WeatherSystem.currentMinute < 60) {
+        // Debug log for successful time setting
+        logDebug(`Time successfully set to ${state.WeatherSystem.currentHour.toString().padStart(2, '0')}:${state.WeatherSystem.currentMinute.toString().padStart(2, '0')}`);
+    } else {
+        // Debug log for invalid time attempt
+        logDebug(`Invalid time attempted to be set - Hour: ${state.WeatherSystem.currentHour}, Minute: ${state.WeatherSystem.currentMinute}`);
+    }
+}
+
+function daysInMonth(year, month) {
+    return new Date(year, month, 0).getDate();
+}
+
+function getLeapDayName(calendarType) {
+    switch (calendarType) {
+        case 'mystara':
+            return "Starfall"; // Every 6 years
+        case 'athas':
+            return "Sun's Respite"; // Every 8 years
+        case 'ravenloft':
+            return "Night of the Shadowed Veil"; // Every 13 years
+        case 'greyhawk':
+            return "Festival of the Unseen Moon"; // Every 4 years
+        case 'eberron':
+            return "Day of the Twelfth Dragon"; // Every 5 years
+        case 'gregorian':
+            return "Leap Day"; // Traditional leap day in the Gregorian calendar
+        // Add other specific leap day names for different calendars as needed
+        default:
+            return "Leap Day";  // Generic fallback for calendars without specific leap day names
+    }
+}
+
+     var defaultTemplate = {
+    boxcode: `<div style='background-color: #ffecd8; border: 2px solid #d35400; border-radius: 10px; padding: 10px; margin: 5px; font-family: "Trebuchet MS", Helvetica, sans-serif; box-shadow: 0px 0px 10px rgba(211, 84, 0, 0.5);'>`,
+    titlecode: `<div style='font-weight: bold; background-color: #e67e22; color: black; padding: 5px; margin-bottom: 5px; border-radius: 5px; text-align: center; font-size: 16px; font-family: "Lucida Handwriting", cursive;'>`,
+    textcode: `<div style='background-color: #fef5e7; padding: 5px; border-radius: 5px; color: #2c3e50; font-size: 14px; font-family: "Trebuchet MS", Helvetica, sans-serif; text-align: justify;'>`,
+    buttonstyle: `style='display: block; margin: 10px 0; color: black; background-color: #f0b27a; padding: 5px; text-align: center; border-radius: 3px; text-decoration: none; font-weight: bold; font-family: "Lucida Handwriting", cursive;'`,
+    footer: `</div></div>`
+};
+// Define the desired Supernotes template name here
+    var supernotesTemplateName = "scroll";  // Change this to switch templates
+
+function getTemplate() {
+    // Check if Supernotes_Templates is defined and contains the desired template
+    if (typeof Supernotes_Templates !== 'undefined' && Supernotes_Templates[supernotesTemplateName]) {
+        let supernotesTemplate = Supernotes_Templates[supernotesTemplateName];
+        // Construct a template object based on Supernotes' template details
+        let template = {
+            boxcode: supernotesTemplate.boxcode,
+            titlecode: supernotesTemplate.titlecode,
+            textcode: supernotesTemplate.textcode,
+            footer: supernotesTemplate.footer
+        };
+        return template;
+    } else {
+        // Fallback to the default template if Supernotes is not available or the template is not found
+        return {
+            boxcode: `<div style='background-color: #ffecd8; border: 2px solid #d35400; border-radius: 10px; padding: 10px; margin: 5px; font-family: "Trebuchet MS", Helvetica, sans-serif; box-shadow: 0px 0px 10px rgba(211, 84, 0, 0.5);'>`,
+    titlecode: `<div style='font-weight: bold; background-color: #e67e22; color: black; padding: 5px; margin-bottom: 5px; border-radius: 5px; text-align: center; font-size: 16px; font-family: "Lucida Handwriting", cursive;'>`,
+    textcode: `<div style='background-color: #fef5e7; padding: 5px; border-radius: 5px; color: #2c3e50; font-size: 14px; font-family: "Trebuchet MS", Helvetica, sans-serif; text-align: justify;'>`,
+    buttonstyle: `style='display: block; margin: 10px 0; color: black; background-color: #f0b27a; padding: 5px; text-align: center; border-radius: 3px; text-decoration: none; font-weight: bold; font-family: "Lucida Handwriting", cursive;'`,
+    footer: `</div></div>`
+};
+    }
+}
+
+function getRandomElement(array) {
+    return array[Math.floor(Math.random() * array.length)];
+}
+
+function chooseWeather(biome, season, timeOfDay) {
+    logDebug(`Choosing weather for Biome: ${biome}, Season: ${season}, Time of Day: ${timeOfDay}`);
+    let isOffSeason = Math.random() < offSeasonChance / 100;
+    let isMagical = Math.random() < magicalWeatherChance / 100;
+
+    // Determine if the biome has unique seasons
+    let biomeHasUniqueSeasons = uniqueSeasons.hasOwnProperty(biome);
+    let selectedSeason = season;
+
+    if (biomeHasUniqueSeasons) {
+        let biomeSeasons = uniqueSeasons[biome];
+        if (!biomeSeasons.includes(season)) {
+            selectedSeason = getRandomElement(biomeSeasons);
+        } else if (isOffSeason) {
+            selectedSeason = getRandomElement(biomeSeasons.filter(s => s !== season));
+        }
+    } else {
+        selectedSeason = isOffSeason ? getRandomElement(seasons.filter(s => s !== season)) : season;
+    }
+
+    let weatherOptions = [];
+    if (isMagical && weatherDetails[biome]["Magical"] && weatherDetails[biome]["Magical"][timeOfDay]) {
+        weatherOptions = weatherDetails[biome]["Magical"][timeOfDay];
+    } else if (weatherDetails[biome][selectedSeason] && weatherDetails[biome][selectedSeason][timeOfDay]) {
+        weatherOptions = weatherDetails[biome][selectedSeason][timeOfDay];
+    }
+
+    if (weatherOptions.length > 0) {
+        logDebug(`Weather details found for Biome: ${biome}, Season: ${selectedSeason}, Time of Day: ${timeOfDay}`);
+        return getRandomElement(weatherOptions);
+    } else {
+        logDebug(`No weather details found for Biome: ${biome}, Season: ${selectedSeason}, Time of Day: ${timeOfDay}`);
+        return "No specific weather data available.";
+    }
+}
+
+function getTimeOfDayBackgroundColor(timeOfDay) {
+    switch (timeOfDay) {
+        case 'Morning':
+            return '#FFD700';  // Gold for morning
+        case 'Afternoon':
+            return '#87CEEB';  // Sky blue for afternoon
+        case 'Evening':
+            return '#FFA07A';  // Light salmon for evening
+        case 'Night':
+            return '#2F4F4F';  // Dark slate grey for night
+        case 'All day':
+        default:
+            return '#FFFFFF';  // White for all day or default
+    }
+}
+
+function displayWeather(biome, season, timeOfDay) {
+    logDebug(`displayWeather called with Biome: ${biome}, Season: ${season}, Time of Day: ${timeOfDay}`);
+    let template = getTemplate();
+    let message = template.boxcode + template.titlecode + `Weather Report for ${biome}, ${season}` + template.footer;
+
+    if (timeOfDay.toLowerCase() === 'all-day') {
+        // Handle 'all-day' by cycling through each time of day and compiling their weather data
+        ['Morning', 'Afternoon', 'Evening', 'Night'].forEach(partOfDay => {
+            const weatherNarrative = chooseWeather(biome, season, partOfDay);
+            const introPhrase = getIntroPhrase(biome, partOfDay);
+            message += template.textcode + formatTimeOfDay(partOfDay) + introPhrase + " " + weatherNarrative + template.footer;
+        });
+    } else {
+        // Handle specific time of day
+        const weatherNarrative = chooseWeather(biome, season, timeOfDay);
+        const introPhrase = getIntroPhrase(biome, timeOfDay);
+        message += template.textcode + formatTimeOfDay(timeOfDay) + introPhrase + " " + weatherNarrative + template.footer;
+    }
+
+    sendChat("Weather", message);
+}
+
+function formatTimeOfDay(timeOfDay) {
+    return `<b><u>${timeOfDay}</u></b> `;
+}
+
+function createButton(label, command) {
+    let template = getTemplate();
+    return `<a ${template.buttonstyle} href="${command}">${label}</a>`;
+}
+
+function parseCommand(command) {
+    logDebug(`parseCommand received: ${command}`);
+    const args = command.split(/\s+/);
+    const action = args.shift();
+    if (action === '!castweather') {
+        const biome = args.shift();
+        const season = args.shift();
+        const timeOfDay = args.join(' ') || 'All day'; // Join the rest as time of day, defaulting to 'All day'
+
+        logDebug(`Parsed Command - Biome: ${biome}, Season: ${season}, Time of Day: ${timeOfDay}`);
+        return { biome, season, timeOfDay };
+    }
+
+    logDebug(`parseCommand action not recognized: ${action}`);
+    return null;
+}
+
+function registerEventHandlers() {
+    on('chat:message', function(msg) {
+        if (msg.type !== 'api') return;
+
+        logDebug(`Received message: ${msg.content}`);
+        const args = msg.content.split(' ');
+        const command = args.shift();
+
+        switch (command) {
+            case '!toggleDebug':
+                toggleDebug();
+                break;
+
+            case '!setCalendarType':
+                setCalendarType(args.join(' '));
+                showDmControlPanel();
+                break;
+
+            case '!resetWeatherSystem':
+                resetToDefault();
+                sendChat('WeatherSystem', '/w gm Weather system has been reset to default values.');
+                break;
+
+            case '!castweather':
+                handleCastWeather(args);
+                break;
+
+            case '!selectbiome':
+                selectBiome(args.join(' '));
+                showDmControlPanel();
+                break;
+
+            case '!setyear':
+                setYear(parseInt(args[0], 10));
+                showDmControlPanel();
+                break;
+
+            case '!setmonth':
+                setMonth(args.join(' '));
+                showDmControlPanel();
+                break;
+
+            case '!setday':
+                setDay(parseInt(args[0], 10));
+                showDmControlPanel();
+                break;
+
+            case '!settime':
+                setTime(parseInt(args[0], 10), parseInt(args[1], 10));
+                showDmControlPanel();
+                break;
+
+            case '!advancetime':
+                advanceTime(args[0], parseInt(args[1], 10));
+                showDmControlPanel();
+                break;
+
+            case '!setseason':
+                setSeason(decodeURIComponent(args.join(' ')));
+                showDmControlPanel();
+                break;
+
+            case '!WeatherSystemMainMenu':
+                showMainMenu();
+                break;
+
+            case '!displayCalendar':
+                displayCalendar();
+                break;
+
+            case '!showDmControlPanel':
+                showDmControlPanel();
+                break;
+
+            case '!addHolidayMenu':
+                addHolidayMenu();
+                break;
+
+            case '!setHolidayName':
+                setHolidayName(args.join(' '));
+                break;
+
+            case '!setHolidayMonth':
+                setHolidayMonth(args.join(' '));
+                break;
+
+            case '!setHolidayDay':
+                setHolidayDay(parseInt(args[0], 10));
+                break;
+                
+            case '!reviewHoliday':
+                reviewHoliday();
+                break;
+
+            case '!finaliseHoliday':
+                finaliseHoliday();
+                break;
+                
+            case '!finaliseHolidayAndAddNew':
+                finaliseHoliday();
+                addHolidayMenu();
+                break;
+
+            case '!finaliseHolidayAndOpenMenu':
+                finaliseHoliday();
+                showMainMenu();
+                break;
+
+            case '!clearTempStorage':
+                clearTempStorage();
+                break;
+
+            case '!promptMonthSelection':
+                promptMonthSelection();
+                break;
+                
+            case '!removeAllUserAddedHolidays':
+                removeAllUserAddedHolidays();
+                break;
+
+            case '!displayUserAddedHolidays':
+                displayUserAddedHolidays();
+                break;
+
+            case '!removeHoliday':
+                removeUserAddedHoliday(args.join(' '));
+                displayUserAddedHolidays();
+                break;
+
+            default:
+                logDebug(`Command not recognized: ${command}`);
+                break;
+        }
+    });
+}
+
+function handleCastWeather(args) {
+    const [biome, ...weatherArgs] = args;
+    const timeOfDayIndex = weatherArgs.lastIndexOf('all-day') > -1 ? weatherArgs.lastIndexOf('all-day') : weatherArgs.length - 1;
+    const season = weatherArgs.slice(0, timeOfDayIndex).join(' ');
+    const timeOfDay = weatherArgs[timeOfDayIndex];
+    displayWeather(biome, season, timeOfDay);
+}
+
+function handleAdvanceTime(command) {
+    logDebug("Current calendar type:", state.WeatherSystem.currentCalendarType);
+    logDebug("Available calendars:", Object.keys(Calendars));
+    let [action, unit, value] = command.split(' ').slice(1);
+    value = parseInt(value);
+    let resultMessage;
+
+    switch (unit) {
+        case 'minute':
+        case 'minutes':
+            resultMessage = advanceMinutes(value);
+            sendChat("System", `You have advanced time by ${value} minute(s). The time is now ${resultMessage}.`);
+            break;
+        case 'hour':
+        case 'hours':
+            resultMessage = advanceHours(value);
+            sendChat("System", `You have advanced time by ${value} hour(s). The time is now ${resultMessage}.`);
+            break;
+        case 'day':
+        case 'days':
+            resultMessage = advanceDays(value);
+            sendChat("System", `You have advanced time by ${value} day(s). The time is now ${resultMessage}.`);
+            break;
+        case 'month':
+        case 'months':
+            resultMessage = advanceMonths(value);
+            sendChat("System", `You have advanced time by ${value} month(s). The time is now ${resultMessage}.`);
+            break;
+        default:
+            sendChat("System", "Invalid time unit for advancing time.");
+    }
+}
+
+function resetToDefault() {
+    state.WeatherSystem = {
+        currentYear: 1492, // Default year
+        currentMonth: 0,   // Default month (January, assuming 1-indexed months)
+        currentDay: 1,     // Default day
+        currentHour: 0,    // Default hour
+        currentMinute: 0,  // Default minute
+        calendars: Calendars,  // Assuming Calendars is defined elsewhere in the script
+        currentCalendarType: 'faerun', // Default calendar type
+        currentBiome: 'Fields/Farmland', // Default biome
+        currentSeason: 'Spring', // Default season
+        // Include other default settings as needed
+    };
+    logDebug('WeatherSystem state has been reset to default values.');
+}
+
+//add holiday functions
+function addHolidayMenu() {
+    logDebug('Entering addHolidayMenu function.');
+
+    let template = getTemplate();
+    let calendarType = state.WeatherSystem.currentCalendarType;
+    let currentCalendar = Calendars[calendarType];
+    let monthOptions = currentCalendar.months.map(m => m.name).join('|');
+
+    logDebug(`Current calendar type: ${calendarType}`);
+    logDebug(`Month options: ${monthOptions}`);
+
+    let dayButtonAction;
+    if (state.WeatherSystem.tempHoliday && state.WeatherSystem.tempHoliday.monthIndex !== undefined) {
+        let selectedMonth = state.WeatherSystem.tempHoliday.monthIndex;
+        let daysInMonth = currentCalendar.months[selectedMonth].days;
+        let dayOptions = Array.from({ length: daysInMonth }, (_, i) => i + 1).join("|");
+        dayButtonAction = `!setHolidayDay ?{Choose Day|${dayOptions}}`;
+        logDebug(`Day options for month index ${selectedMonth}: ${dayOptions}`);
+    } else {
+        dayButtonAction = "!promptMonthSelection";
+        logDebug('No month selected, prompting for month selection.');
+    }
+
+    let message = template.boxcode;
+    message += template.titlecode + "Add New Holiday" + template.footer;
+    message += template.textcode;
+    message += createButton("Set Holiday Name", "!setHolidayName ?{Enter the name of the holiday:|Holiday Name}");
+    message += createButton("Select Month", `!setHolidayMonth ?{Choose Month|${monthOptions}}`);
+    message += createButton("Select Day", dayButtonAction);
+    message += createButton("Review Holiday", "!reviewHoliday");
+    message += createButton("Finalise Holiday", "!finaliseHoliday");
+    message += createButton("Clear Temporary Storage", "!clearTempStorage");
+    message += template.footer;
+
+    sendChat("Add Holiday", message);
+    logDebug('Add Holiday menu displayed.');
+}
+
+function setHolidayName(holidayName) {
+    logDebug(`Entering setHolidayName function with holidayName: ${holidayName}`);
+
+    if (!holidayName) {
+        sendChat("Error", "No holiday name was entered.");
+        logDebug('No holiday name entered.');
+        return;
+    }
+
+    if (!state.WeatherSystem.tempHoliday) {
+        state.WeatherSystem.tempHoliday = {};
+    }
+
+    state.WeatherSystem.tempHoliday.name = holidayName.trim();
+    logDebug(`Holiday name set in tempHoliday storage: ${holidayName.trim()}`);
+}
+
+function setHolidayMonth(monthName) {
+    logDebug(`Entering setHolidayMonth function with monthName: ${monthName}`);
+
+    let calendarType = state.WeatherSystem.currentCalendarType;
+    let currentCalendar = Calendars[calendarType];
+    let monthIndex = currentCalendar.months.findIndex(m => m.name === monthName);
+
+    if (monthIndex >= 0) {
+        if (!state.WeatherSystem.tempHoliday) {
+            state.WeatherSystem.tempHoliday = {};
+        }
+        state.WeatherSystem.tempHoliday.monthIndex = monthIndex;
+        logDebug(`Month index set in tempHoliday storage: ${monthIndex}`);
+        addHolidayMenu();  // Refresh the menu to update the day selection button
+    } else {
+        sendChat("Error", `Invalid month name: ${monthName}.`);
+        logDebug(`Invalid month name received: ${monthName}`);
+    }
+}
+
+function promptMonthSelection() {
+    logDebug('Entering promptMonthSelection function.');
+    sendChat("Error", "Month not selected. Please select a month first.");
+}
+
+function setHolidayDay(day) {
+    logDebug(`Entering setHolidayDay function with day: ${day}`);
+
+    // Ensure day is an actual number and not the prompt string
+    if (!day || isNaN(parseInt(day))) {
+        logDebug('Invalid day selection.');
+        sendChat("Error", "Invalid day selection.");
+        return;
+    }
+
+    if (!state.WeatherSystem.tempHoliday) {
+        state.WeatherSystem.tempHoliday = {};
+    }
+
+    state.WeatherSystem.tempHoliday.day = parseInt(day, 10);
+    logDebug(`Day set in tempHoliday storage: ${day}`);
+
+    // Automatically proceed to review the holiday after setting the day
+    reviewHoliday();
+}
+
+function reviewHoliday() {
+    logDebug('Entering reviewHoliday function.');
+
+    if (!state.WeatherSystem.tempHoliday || !state.WeatherSystem.tempHoliday.name || state.WeatherSystem.tempHoliday.monthIndex === undefined || state.WeatherSystem.tempHoliday.day === undefined) {
+        sendChat("Error", "Holiday data is incomplete. Please ensure all details are filled.");
+        logDebug('Incomplete holiday data.');
+        return;
+    }
+
+    let holidayName = state.WeatherSystem.tempHoliday.name;
+    let monthIndex = state.WeatherSystem.tempHoliday.monthIndex;
+    let day = state.WeatherSystem.tempHoliday.day;
+    logDebug(`Reviewing holiday: Name=${holidayName}, MonthIndex=${monthIndex}, Day=${day}`);
+
+    let monthName = Calendars[state.WeatherSystem.currentCalendarType].months[monthIndex].name;
+    let template = getTemplate();
+    let message = template.boxcode;
+    message += template.titlecode + "Review Holiday" + template.footer;
+    message += template.textcode;
+    message += `Name: ${holidayName}<br>Month: ${monthName}<br>Day: ${day}<br>`;
+    message += createButton("Confirm", "!finaliseHoliday") + " ";
+    message += createButton("Confirm + Add New Holiday", "!finaliseHolidayAndAddNew") + " ";
+    message += createButton("Confirm + Open Main Menu", "!finaliseHolidayAndOpenMenu") + " ";
+    message += createButton("Cancel", "!clearTempStorage");
+    message += template.footer;
+
+    sendChat("Review Holiday", message);
+    logDebug('Review Holiday menu displayed.');
+}
+
+function finaliseHoliday() {
+    logDebug('Entering finaliseHoliday function.');
+
+    if (!state.WeatherSystem.tempHoliday || !state.WeatherSystem.tempHoliday.name || state.WeatherSystem.tempHoliday.monthIndex === undefined || state.WeatherSystem.tempHoliday.day === undefined) {
+        sendChat("Error", "Holiday data is incomplete.");
+        logDebug('Holiday data is incomplete.');
+        return;
+    }
+
+    let holidayName = state.WeatherSystem.tempHoliday.name;
+    let monthIndex = state.WeatherSystem.tempHoliday.monthIndex;
+    let day = state.WeatherSystem.tempHoliday.day;
+    let monthName = Calendars[state.WeatherSystem.currentCalendarType].months[monthIndex].name;
+
+    logDebug(`Finalising holiday: Name=${holidayName}, Month=${monthName}, Day=${day}`);
+
+    if (!state.WeatherSystem.holidays) {
+        state.WeatherSystem.holidays = {};
+    }
+
+    if (!state.WeatherSystem.holidays[state.WeatherSystem.currentCalendarType]) {
+        state.WeatherSystem.holidays[state.WeatherSystem.currentCalendarType] = [];
+    }
+
+    state.WeatherSystem.holidays[state.WeatherSystem.currentCalendarType].push({
+        name: holidayName,
+        month: monthName,
+        day: day,
+        userAdded: true  // This flag indicates the holiday was added by a user
+    });
+
+    sendChat("Add Holiday", `Holiday '${holidayName}' added on ${monthName} ${day}.`);
+    logDebug(`Holiday added to ${state.WeatherSystem.currentCalendarType} calendar: ${holidayName} on ${monthName} ${day}.`);
+
+    clearTempStorage();
+    logDebug('Temporary storage cleared.');
+}
+
+function clearTempStorage() {
+    logDebug('Entering clearTempStorage function.');
+    state.WeatherSystem.tempHoliday = {};
+    logDebug('Temporary storage cleared.');
+}
+
+//edit and delete user added holidays
+function displayUserAddedHolidays() {
+    const calendarType = state.WeatherSystem.currentCalendarType;
+    const userHolidays = state.WeatherSystem.holidays[calendarType] ? state.WeatherSystem.holidays[calendarType].filter(holiday => holiday.userAdded) : [];
+    
+    logDebug(`Displaying user-added holidays for calendar type: ${calendarType}`);
+    
+    let template = getTemplate();
+    let message = template.boxcode;
+    message += template.titlecode + "User-Added Holidays" + template.footer;
+    message += template.textcode;
+
+    if (userHolidays.length === 0) {
+        message += "No user-added holidays found.<br>";
+        logDebug("No user-added holidays found.");
+    } else {
+        userHolidays.forEach(holiday => {
+            message += `${holiday.name} on ${holiday.month} ${holiday.day} `;
+            // Ensure the holiday name is properly encoded for URL to avoid issues with spaces and special characters
+            let encodedName = encodeURIComponent(holiday.name);
+            message += createButton("Remove", `!removeHoliday ${encodedName}`) + "<br>";
+            logDebug(`Added button to remove holiday: ${holiday.name}`);
+        });
+    }
+
+    message += createButton("Remove All", "!removeAllUserAddedHolidays");
+    message += createButton("Main Menu", "!WeatherSystemMainMenu")
+    message += template.footer;
+
+    sendChat("Holiday Management", message);
+}
+
+function removeAllUserAddedHolidays() {
+    const calendarType = state.WeatherSystem.currentCalendarType;
+    if (state.WeatherSystem.holidays && state.WeatherSystem.holidays[calendarType]) {
+        state.WeatherSystem.holidays[calendarType] = state.WeatherSystem.holidays[calendarType].filter(holiday => !holiday.userAdded);
+        sendChat("System", "All user-added holidays have been removed.");
+        logDebug("All user-added holidays have been removed.");
+    } else {
+        sendChat("Error", "No user-added holidays found to remove.");
+        logDebug("No user-added holidays found to remove.");
+    }
+}
+
+function removeUserAddedHoliday(holidayName) {
+    holidayName = decodeURIComponent(holidayName);
+    logDebug(`Attempting to remove holiday with name: ${holidayName}`);
+
+    const calendarType = state.WeatherSystem.currentCalendarType;
+    if (state.WeatherSystem.holidays && state.WeatherSystem.holidays[calendarType]) {
+        const holidayIndex = state.WeatherSystem.holidays[calendarType].findIndex(holiday => holiday.userAdded && holiday.name === holidayName);
+
+        if (holidayIndex >= 0) {
+            state.WeatherSystem.holidays[calendarType].splice(holidayIndex, 1);
+            logDebug(`Removed holiday: ${holidayName}`);
+            sendChat("Holiday Management", `Successfully removed the holiday: ${holidayName}`);
+        } else {
+            logDebug(`Error: No user-added holiday found with the name '${holidayName}'`);
+            sendChat("Error", `No user-added holiday found with the name '${holidayName}'.`);
+        }
+    } else {
+        sendChat("Error", `No holidays found for calendar type '${calendarType}'.`);
+        logDebug(`No holidays found for calendar type '${calendarType}'.`);
+    }
+}
+
+//create user added Calendar
+
+
+return {
+    RegisterEventHandlers: registerEventHandlers
+};
+}());
+
+on("ready", function() {
+    WeatherSystem.RegisterEventHandlers();
+});
